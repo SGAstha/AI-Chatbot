@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI SYMPTOM CHECKER</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Start of CSS styling for presentation */
+        /* General Setup and Layout */
+        /* Defines core font, limits content width, centers content, sets background, and enforces vertical stacking */
+        body { font-family: 'Inter', sans-serif; max-width: 800px; margin: 0 auto; padding: 0; background-color: #f4f7f6; display: flex; flex-direction: column; min-height: 100vh; }
+        /* Allows the main content area to take up all remaining vertical space (crucial for 100vh chat mode) */
+        .main-container { flex-grow: 1; position: relative; }
+        
+        /* Landing Page (Initial View) */
+        #landingPage {
+            /* Sets display to flex for easy centering */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 90vh; /* Takes up most of the viewport height when chat is closed */
+            text-align: center;
+        }
+        #landingPage h1 {
+            color: #004d99;
+            font-size: 3rem;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            margin-bottom: 30px;
+            padding: 10px;
+            border-bottom: 4px solid #007bff; /* Adds a distinctive blue underline */
+        }
+        
+        /* Floating Chat Icon (Common to both pages) */
+        #chatIcon {
+            /* Fixed position relative to the viewport */
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background-color: #28a745; /* Green background */
+            color: white;
+            border-radius: 50%; /* Makes it a perfect circle */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            /* Adds a subtle shadow for a floating effect */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            cursor: pointer;
+            /* Smooth transition for hover effects */
+            transition: transform 0.3s, background-color 0.3s;
+            z-index: 100; /* Ensures it stays on top of all other content */
+        }
+        #chatIcon:hover {
+            background-color: #218838;
+            transform: scale(1.05); /* Slight zoom on hover */
+        }
+
+        /* Chat Interface */
+        #chatInterface {
+            display: none; /* Initially hidden, toggled by chatIcon */
+            flex-direction: column;
+            height: 100vh; /* Full screen height for chat mode */
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            max-width: 600px; /* Constrains width for readability */
+            margin: 0 auto;
+            position: relative; /* Context for absolute-positioned elements like the suggestion box */
+        }
+        
+        #chatHeader {
+            background-color: #007bff; /* Primary blue header color */
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.2rem;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        /* Chat Box (Scrollable message area) */
+        #chatBox { 
+            flex-grow: 1; /* Key for chat box to fill vertical space, pushing input to the bottom */
+            padding: 20px; 
+            overflow-y: auto; /* Enables vertical scrolling for the message history */
+            border-bottom: 1px solid #eee;
+            display: flex;
+            flex-direction: column; /* Messages stack vertically */
+        }
+
+        /* Message Styles (Base) */
+        .message { margin-bottom: 15px; max-width: 80%; padding: 10px 15px; border-radius: 18px; line-height: 1.4; }
+        
+        .user-message { 
+            background-color: #007bff; 
+            color: white; 
+            align-self: flex-end; /* Pushes user messages to the right side of the chat box */
+            border-bottom-right-radius: 2px; /* Creates a slight "chat tail" effect */
+        }
+        
+        .ai-message { 
+            background-color: #e9ecef; 
+            color: #333; 
+            align-self: flex-start; /* Keeps AI messages on the left side of the chat box */
+            border-bottom-left-radius: 2px; /* Creates a slight "chat tail" effect */
+            /* Allows pre-formatted text (like lists) to wrap properly */
+            white-space: pre-wrap; 
+        }
+        .ai-message strong { color: #0056b3; }
+        /* Styling for the numbered list output generated from the AI response */
+        .ai-message ol {
+            margin: 5px 0 0 15px;
+            padding: 0;
+        }
+        .ai-message ol li {
+            margin-bottom: 5px;
+        }
+
+        /* Container for the text input and buttons */
+        .input-area { 
+            display: flex; 
+            padding: 15px; 
+            border-top: 1px solid #ccc; 
+            position: relative; /* Context for the suggestion box */
+        }
+
+        /* Input and Button Styles */
+        #symptomInput { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 25px; margin-right: 10px; font-size: 1em; }
+        
+        #sendBtn { background-color: #007bff; color: white; padding: 12px 20px; border-radius: 25px; cursor: pointer; transition: background-color 0.3s; }
+        #sendBtn:hover { background-color: #0056b3; }
+
+        #historyBtn { background-color: #6c757d; color: white; padding: 12px 10px; border-radius: 25px; cursor: pointer; transition: background-color 0.3s; margin-left: 5px;}
+        #historyBtn:hover { background-color: #5a6268; }
+
+        /* History List Display Styles */
+        .history-item { 
+            cursor: pointer; 
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            background-color: #f0f8ff; 
+            margin-bottom: 10px; 
+            transition: background-color 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #cce5ff;
+            font-size: 0.95em;
+        }
+        .history-item:hover {
+            background-color: #e6f2ff;
+        }
+        .history-item span {
+            flex-grow: 1;
+            margin-right: 10px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis; /* Truncate long symptom descriptions */
+        }
+        .delete-icon {
+            color: #dc3545; /* Red color for delete icon */
+            cursor: pointer;
+            padding: 0 5px;
+            transition: color 0.2s;
+        }
+        .delete-icon:hover {
+            color: #c82333;
+        }
+        /* Style for the 'Clear All History' button */
+        .delete-all-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background-color 0.3s;
+        }
+        .delete-all-btn:hover {
+            background-color: #c82333;
+        }
+
+        /* Real-time Suggestion Box (Appears above the input) */
+        #historySuggestion {
+            position: absolute; /* Positioned relative to the .input-area parent */
+            bottom: 75px; /* Position above the input area */
+            left: 15px;
+            right: 15px;
+            background-color: #fff8e1; /* Light yellow for suggestion */
+            border: 1px solid #ffecb3;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            font-size: 0.9em;
+            color: #333;
+            cursor: pointer;
+            z-index: 50;
+            display: none; /* Initially hidden */
+            transition: opacity 0.3s;
+        }
+        #historySuggestion:hover {
+            background-color: #ffedc3;
+        }
+        .suggestion-text {
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        /* Utility Styles */
+        .error { color: red; font-weight: bold; margin-top: 10px; }
+        .info { color: #6c757d; font-style: italic; text-align: center; margin-bottom: 15px; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+
+        <div id="landingPage">
+            <h1>AI SYMPTOM CHECKER</h1>
+            <p style="font-size: 1.2rem; color: #555;">Click the chat icon in the corner to begin your triage analysis.</p>
+        </div>
+
+        <div id="chatInterface" style="display: none;">
+            <div id="chatHeader">AI Triage Chat</div>
+            <div id="chatBox">
+                <div class="ai-message message">
+                    <strong>AI chatbot:</strong> Hello! Describe your symptom(s)  to get an immediate analysis.
+                </div>
+            </div>
+            
+            <div id="historySuggestion" style="display: none;">
+                <i class="fas fa-history" style="color: #ff9800; margin-right: 5px;"></i> 
+                You have analyzed a similar query: <span class="suggestion-text"></span>. 
+                Click here to view history.
+            </div>
+
+            <div class="input-area">
+                <input type="text" id="symptomInput" placeholder="Enter symptom description...">
+                <button id="sendBtn">Analyze</button>
+                <button id="historyBtn" title="View History"><i class="fas fa-history"></i></button>
+            </div>
+        </div>
+
+        <div id="chatIcon">
+            <i class="fas fa-comment-dots"></i>
+        </div>
+
+    </div>
+    <script>
+        // --- Start of JavaScript logic ---
+
+        // --- DOM Element References (Cache DOM elements for efficiency) ---
+        const chatIcon = document.getElementById('chatIcon');
+        const landingPage = document.getElementById('landingPage');
+        const chatInterface = document.getElementById('chatInterface');
+        const symptomInput = document.getElementById('symptomInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const chatBox = document.getElementById('chatBox');
+        const historyBtn = document.getElementById('historyBtn');
+        const historySuggestion = document.getElementById('historySuggestion');
+        const suggestionText = document.querySelector('.suggestion-text');
+
+        // --- State Variables ---
+        // Flag to prevent multiple simultaneous API calls for diagnosis
+        let isWaitingForDiagnosis = false;
+        // Flag to track if the user is currently viewing the history list view
+        let isViewingHistory = false;
+        // Local in-memory cache for symptom history (key: symptom string, value: {analysis, source})
+        let localHistoryCache = {};
+        // Variable to hold the debounce timer ID for the suggestion box
+        let debounceTimeout;
+
+        // --- Core UI Functions ---
+
+        // Scrolls the chat box to the very bottom to show the newest message
+        function scrollToBottom() {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // Creates and appends a new message div to the chatBox
+        function displayMessage(text, sender, htmlContent = false) {
+            const messageDiv = document.createElement('div');
+            // Constructs the class name (e.g., 'message ai-message')
+            messageDiv.className = `message ${sender}-message`;
+            if (htmlContent) {
+                // If true, insert raw HTML content (used for lists/history)
+                messageDiv.innerHTML = text;
+            } else {
+                // If false, insert plain text content
+                messageDiv.textContent = text;
+            }
+            chatBox.appendChild(messageDiv);
+            scrollToBottom(); // Scroll down to the newly added message
+        }
+        
+        // Formats the raw AI analysis text into an HTML ordered list for better presentation
+        function displayFormattedAnalysis(analysis, source) {
+            // Start the message with a heading indicating the source
+            let html = `<strong>🔍 AI Triage Summary (${source}):</strong>`;
+            
+            // Check for the non-medical flag returned by the server
+            if (analysis.includes("is not a medical symptom")) {
+                 html += `<p class="error">${analysis}</p>`;
+            } else {
+                // Use a Regular Expression to find all lines starting with a number and a dot (e.g., "1. ")
+                // 'gm' flags enable global search across multiple lines
+                const listItems = analysis.match(/^\d+\.\s.*$/gm);
+                
+                if (listItems) {
+                    html += '<ol>'; // Start an ordered list
+                    listItems.forEach(item => {
+                        // Remove the leading number and dot (e.g., "1. ") from the list item
+                        const content = item.replace(/^\d+\.\s*/, '').trim();
+                        html += `<li>${content}</li>`; // Add the cleaned content as a list item
+                    });
+                    html += '</ol>'; // Close the ordered list
+                } else {
+                    // Fallback: if the AI didn't format it as a list, display it as a paragraph
+                    html += `<p>${analysis}</p>`;
+                }
+            }
+
+            displayMessage(html, 'ai', true); // Display the generated HTML message
+        }
+
+        // --- Navigation and History Cache ---
+
+        // Asynchronously fetches the entire history into the local cache from the backend
+        async function fetchLocalHistoryCache() {
+            try {
+                // Initiates the request to the mock backend endpoint
+                const response = await fetch('/history'); 
+                if (response.ok) {
+                    // Parse the JSON response and update the local state variable
+                    localHistoryCache = await response.json();
+                } else {
+                    console.error("Failed to load history cache.");
+                }
+            } catch (error) {
+                console.error("Error fetching history cache:", error);
+            }
+        }
+
+        // Toggles between the landing page and the main chat interface
+        function toggleChat() {
+            // Check current visibility state
+            const isChatVisible = chatInterface.style.display !== 'none';
+            if (isChatVisible) {
+                // Hiding chat, show landing page
+                landingPage.style.display = 'flex';
+                chatInterface.style.display = 'none';
+                chatIcon.innerHTML = '<i class="fas fa-comment-dots"></i>'; // Change icon back to chat bubble
+                isViewingHistory = false; // Ensure history state is reset
+            } else {
+                // Showing chat, hide landing page
+                landingPage.style.display = 'none';
+                chatInterface.style.display = 'flex';
+                chatIcon.innerHTML = '<i class="fas fa-times"></i>'; // Change icon to 'X' for closing
+                // Load cache immediately when opening chat to enable history/suggestions
+                fetchLocalHistoryCache();
+                scrollToBottom();
+            }
+        }
+
+        // Displays the list of past analyses (history) in the chat window
+        async function fetchHistory() {
+            if (isViewingHistory) {
+                // If history is currently shown, go back to main chat
+                chatBox.innerHTML = '';
+                displayMessage('AI Triage: Welcome back to the main chat. Please enter your symptoms.', 'ai');
+                isViewingHistory = false;
+                historyBtn.innerHTML = '<i class="fas fa-history"></i>'; // Change icon back to history
+                historyBtn.title = 'View History';
+                return;
+            }
+            
+            // Switch to history view mode
+            isViewingHistory = true;
+            historyBtn.innerHTML = '<i class="fas fa-arrow-left"></i>'; // Change to back arrow icon
+            historyBtn.title = 'Back to Chat';
+            chatBox.innerHTML = ''; // Clear chat to show history list
+
+            // Check if there is any history in the local cache
+            if (Object.keys(localHistoryCache).length === 0) {
+                displayMessage('AI Triage: Your history is empty. Analyze a symptom first.', 'ai');
+                return;
+            }
+
+            let historyContent = '<strong>AI Triage: History of Past Analyses</strong><br><br>';
+            historyContent += '<button class="delete-all-btn" id="deleteAllHistoryBtn">Clear All History</button>';
+            
+            // Loop through all keys in the local cache to build the list
+            for (const key in localHistoryCache) {
+                if (localHistoryCache.hasOwnProperty(key)) {
+                    // Create HTML for each history item, storing the symptom in a data attribute
+                    historyContent += `
+                        <div class="history-item" data-key="${key}">
+                            <span title="${key}">${key}</span>
+                            <i class="fas fa-trash-alt delete-icon" data-key="${key}" title="Delete this entry"></i>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Display history section as a single HTML message
+            displayMessage(historyContent, 'ai', true);
+            scrollToBottom();
+
+            // Attach event listeners to the dynamically created history items
+            document.querySelectorAll('.history-item').forEach(item => {
+                item.addEventListener('click', handleHistoryItemClick);
+            });
+            document.querySelectorAll('.delete-icon').forEach(icon => {
+                // Add event listener for deleting an individual item
+                icon.addEventListener('click', handleDeleteIconClick);
+            });
+            // Add listener for the "Clear All" button
+            document.getElementById('deleteAllHistoryBtn').addEventListener('click', deleteAllHistory);
+        }
+
+        // Handles the click on a history list item to re-display its full analysis
+        function handleHistoryItemClick(event) {
+            // Prevents the history item click if the trash icon within it was clicked
+            if (event.target.classList.contains('delete-icon')) return;
+
+            // Retrieve the symptom key from the clicked item's data attribute
+            const symptomKey = event.currentTarget.dataset.key;
+            if (!symptomKey || !localHistoryCache[symptomKey]) return;
+
+            // Retrieve analysis details from the local cache
+            const analysis = localHistoryCache[symptomKey].analysis;
+            
+            // Reset state back to the main chat view
+            chatBox.innerHTML = '';
+            isViewingHistory = false;
+            historyBtn.innerHTML = '<i class="fas fa-history"></i>';
+            historyBtn.title = 'View History';
+            
+            // Display the original query and the cached analysis
+            displayMessage(`User: ${symptomKey}`, 'user', false);
+            displayFormattedAnalysis(analysis, localHistoryCache[symptomKey].source);
+        }
+        
+        // --- History Deletion Logic ---
+
+        // Handles the click on the individual delete icon
+        function handleDeleteIconClick(event) {
+            event.stopPropagation(); // Prevents the event from bubbling up to the parent history item
+            const symptomKey = event.target.dataset.key;
+            // Confirmation prompt before deletion
+            if (symptomKey && confirm(`Are you sure you want to delete the analysis for "${symptomKey}"?`)) {
+                deleteSpecificHistory(symptomKey);
+            }
+        }
+
+        // Communicates with the backend to delete a single history item and re-renders the list
+        async function deleteSpecificHistory(symptomKey) {
+            try {
+                // Sends a POST request with the specific key to be deleted
+                const response = await fetch('/delete-history', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symptomKey: symptomKey })
+                });
+
+                if (response.ok) {
+                    delete localHistoryCache[symptomKey]; // Delete from local cache
+                    fetchHistory(); // Re-render history list to show the change
+                    displayMessage(`System: Analysis for "${symptomKey}" has been successfully deleted.`, 'ai');
+                } else {
+                    displayMessage(`System Error: Could not delete ${symptomKey}.`, 'ai');
+                }
+            } catch (error) {
+                displayMessage('Fatal Error: Failed to connect to server for deletion.', 'ai');
+            }
+        }
+
+        // Communicates with the backend to clear all history and re-renders the list
+        async function deleteAllHistory() {
+            // Get user confirmation
+            if (!confirm("Are you sure you want to clear ALL recorded history? This cannot be undone.")) return;
+            
+            try {
+                // Sends a request to clear all entries (empty body signals delete all)
+                const response = await fetch('/delete-history', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                if (response.ok) {
+                    localHistoryCache = {}; // Clear local cache
+                    fetchHistory(); // Re-render (will now show "history is empty")
+                    displayMessage('AI Triage: All history records have been cleared.', 'ai');
+                } else {
+                    displayMessage('System Error: Failed to clear history on the server.', 'ai');
+                }
+            } catch (error) {
+                displayMessage('Fatal Error: Failed to connect to server to clear history.', 'ai');
+            }
+        }
+
+
+        // --- Diagnosis Logic ---
+
+        // Main function to send symptom data to the backend for analysis
+        async function getDiagnosis(symptomArray) {
+            if (isWaitingForDiagnosis) return; // Prevent concurrent requests
+            isWaitingForDiagnosis = true;
+
+            // Normalize the symptom for use as a cache key
+            const queryKey = symptomArray[0].toLowerCase();
+
+            // 1. Check local cache first (for instant display if already analyzed)
+            if (localHistoryCache.hasOwnProperty(queryKey)) {
+                const cachedData = localHistoryCache[queryKey];
+                displayMessage('AI Triage: Found in history cache.', 'ai');
+                displayFormattedAnalysis(cachedData.analysis, cachedData.source);
+                isWaitingForDiagnosis = false; // Reset flag after displaying cached result
+                return;
+            }
+
+            displayMessage('🤖 **AI Triage:** Sending symptoms for analysis... Please wait.', 'ai');
+
+            try {
+                // Send the symptom query to the mock backend API for diagnosis
+                const response = await fetch('/diagnose', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symptoms: symptomArray })
+                });
+
+                const data = await response.json(); // Parse the response JSON
+
+                if (response.ok) {
+                    // Success: Display the analysis result
+                    displayFormattedAnalysis(data.diagnosis, data.source);
+                    
+                    // If it was a new diagnosis from the API, update the local cache
+                    if (data.source === 'API') {
+                        localHistoryCache[queryKey] = {
+                            analysis: data.diagnosis,
+                            source: data.source
+                        };
+                    }
+                } else {
+                    // Handle API-level errors (e.g., bad request, server error)
+                    displayMessage(`<strong>🚨 API Request Failed:</strong> <p class="error">${data.error || 'An unknown error occurred.'}</p>`, 'ai', true);
+                }
+            } catch (error) {
+                // Handle network or parsing errors
+                displayMessage(`<strong>🚨 Fatal Error:</strong> <p class="error">Connection failed. Error: ${error.message}</p>`, 'ai', true);
+            } finally {
+                isWaitingForDiagnosis = false; // Always reset the processing flag
+            }
+        }
+
+        // --- Event Listeners ---
+
+        chatIcon.addEventListener('click', toggleChat); // Toggles chat visibility
+        historyBtn.addEventListener('click', fetchHistory); // Toggles history list view
+        historySuggestion.addEventListener('click', fetchHistory); // Clicking suggestion box opens history
+
+        // Handler for sending symptoms via button click
+        sendBtn.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent default form submission behavior (if it were in a form)
+            const rawInput = symptomInput.value.trim();
+            symptomInput.value = ''; // Clear input immediately
+            historySuggestion.style.display = 'none'; // Hide suggestion box
+            if (!rawInput) return; // Do nothing if input is empty
+            
+            displayMessage(rawInput, 'user');
+            getDiagnosis([rawInput]); // Start the diagnosis process
+        });
+
+        // Handler for sending symptoms via Enter key press
+        symptomInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendBtn.click(); // Programmatically trigger the button click logic
+            }
+        });
+        
+        // --- Real-time Suggestion Logic ---
+        
+        // Debounced function to check if the current input is similar to a past analysis
+        function checkSymptomSuggestion() {
+            clearTimeout(debounceTimeout); // Clear any existing timer
+            debounceTimeout = setTimeout(() => {
+                const input = symptomInput.value.trim().toLowerCase();
+                
+                // Guard clause: Hide if input is too short (3 characters minimum) or cache is empty
+                if (input.length < 3 || Object.keys(localHistoryCache).length === 0) {
+                    historySuggestion.style.display = 'none';
+                    return;
+                }
+                
+                let foundKey = null;
+
+                // Iterate through cached keys for a partial match (substring check)
+                for (const key in localHistoryCache) {
+                    if (localHistoryCache.hasOwnProperty(key)) {
+                        // Check if the history key contains the current input string
+                        if (key.includes(input)) {
+                            foundKey = key;
+                            break; // Stop at the first match for responsiveness
+                        }
+                    }
+                }
+                
+                if (foundKey) {
+                    suggestionText.textContent = foundKey; // Set the suggested text
+                    historySuggestion.style.display = 'block'; // Show the suggestion box
+                } else {
+                    historySuggestion.style.display = 'none'; // Hide if no match found
+                }
+            }, 300); // 300ms debounce delay to limit function calls while typing
+        }
+
+        symptomInput.addEventListener('input', checkSymptomSuggestion); // Trigger suggestion check on every input event
+
+
+        // Initial check to ensure landing page is shown on first load if the chat is hidden by default
+        if (chatInterface.style.display === 'none') {
+            landingPage.style.display = 'flex';
+        }
+        // End of script
+    </script>
+</body>
+</html>
